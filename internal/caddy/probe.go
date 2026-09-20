@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const defaultProbeTimeout = 5 * time.Second
+const (
+	defaultProbeTimeout   = 5 * time.Second
+	maximumProbeWaitDelay = 250 * time.Millisecond
+)
 
 var (
 	ErrNotFound     = errors.New("caddy executable not found")
@@ -33,7 +36,8 @@ func probe(ctx context.Context, timeout time.Duration) (Installation, error) {
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	output, err := exec.CommandContext(probeCtx, path, "version").CombinedOutput()
+	versionCommand := probeCommand(probeCtx, timeout, path, "version")
+	output, err := versionCommand.CombinedOutput()
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return Installation{}, ctxErr
@@ -55,7 +59,7 @@ func probe(ctx context.Context, timeout time.Duration) (Installation, error) {
 	if !strings.HasPrefix(version, "v2.") {
 		return Installation{}, fmt.Errorf("%w: %s reports %q; LNS requires Caddy v2", ErrIncompatible, path, version)
 	}
-	adapt := exec.CommandContext(probeCtx, path, "adapt", "--config", "-")
+	adapt := probeCommand(probeCtx, timeout, path, "adapt", "--config", "-")
 	adapt.Stdin = strings.NewReader("{\n\tadmin off\n}\n")
 	if output, err := adapt.CombinedOutput(); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -71,4 +75,10 @@ func probe(ctx context.Context, timeout time.Duration) (Installation, error) {
 		return Installation{}, fmt.Errorf("%w: %s cannot adapt Caddyfiles: %s", ErrIncompatible, path, detail)
 	}
 	return Installation{Path: path, Version: version}, nil
+}
+
+func probeCommand(ctx context.Context, timeout time.Duration, path string, args ...string) *exec.Cmd {
+	command := exec.CommandContext(ctx, path, args...)
+	command.WaitDelay = min(timeout, maximumProbeWaitDelay)
+	return command
 }
