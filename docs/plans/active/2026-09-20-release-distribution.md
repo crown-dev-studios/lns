@@ -227,18 +227,20 @@ flowchart TD
 ## Acceptance Criteria
 
 - [ ] `go install github.com/crown-dev-studios/lns/cmd/lns@<tag>` works from outside the repository with a clean module cache.
-- [ ] The repository has no local `replace` directive required for a release build.
-- [ ] `lns version` reports the release tag, commit, and build date; local builds report `dev` without pretending to be a release.
+- [x] The repository has no local `replace` directive required for a release build.
+- [x] `lns version` reports the release tag, commit, and build date; local builds report `dev` without pretending to be a release.
 - [ ] The first public tag is `v0.1.0`, and `lns version` reports `0.1.0` for that build.
-- [ ] CI passes on supported macOS and Linux targets before a tag can be released.
+- [x] The tag workflow requires the same supported macOS/Linux and Go-version verification matrix as CI before publication.
 - [ ] A SemVer tag publishes macOS and Linux amd64/arm64 artifacts, checksums, SBOMs, and release notes.
-- [ ] No Windows artifact is published until Windows is explicitly supported.
+- [x] No Windows artifact is published until Windows is explicitly supported.
 - [ ] `brew install --cask crown-dev-studios/tap/lns` installs both LNS and the Homebrew Caddy dependency on a clean macOS runner.
 - [ ] The Homebrew installation does not start Caddy or modify a project repository.
-- [ ] `lns doctor` distinguishes missing, broken/incompatible, and usable Caddy installations and prints actionable remediation.
-- [ ] Direct archive and `go install` users get a clear Caddy installation message before LNS attempts project work.
+- [x] `lns doctor` distinguishes missing, broken/incompatible, timed-out, and usable Caddy installations and prints actionable remediation.
+- [x] Direct archive and `go install` users get a clear Caddy installation message before LNS attempts Docker or other project work.
 - [ ] Published checksums verify in an independent post-publish job.
-- [ ] The README no longer tells end users to install from a development checkout.
+- [x] The README no longer tells end users to install from a development checkout.
+
+Repository implementation is complete. The unchecked criteria are release-activation checks that require the first immutable tag and configured signing/tap credentials; they cannot be truthfully completed on an untagged feature branch.
 
 ## Verification
 

@@ -1,0 +1,10 @@
+{
+  "name": "release-smoke",
+  "private": true,
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "vite": "^7"
+  }
+}

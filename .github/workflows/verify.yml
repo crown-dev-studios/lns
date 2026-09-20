@@ -1,0 +1,120 @@
+name: Verify
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Go ${{ matrix.go-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        go-version:
+          - 1.24.x
+          - 1.26.1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Verify formatting
+        run: |
+          go fmt ./...
+          git diff --exit-code
+
+      - name: Verify module files
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -trimpath ./cmd/lns
+
+  archive:
+    name: Archive (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            archive: linux_amd64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+            archive: linux_arm64
+          - os: macos-15-intel
+            target: darwin-amd64
+            archive: darwin_amd64
+          - os: macos-latest
+            target: darwin-arm64
+            archive: darwin_arm64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.26.1
+          cache: true
+
+      - name: Install Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          syft-version: v1.52.0
+
+      - name: Add Syft to PATH
+        env:
+          SYFT_CMD: ${{ steps.syft.outputs.cmd }}
+        run: echo "$(dirname "$SYFT_CMD")" >> "$GITHUB_PATH"
+
+      - name: Build release snapshot
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.18.2
+          args: release --snapshot --clean
+
+      - name: Verify extracted archive
+        shell: bash
+        run: |
+          archives=(build/release/lns_*_${{ matrix.archive }}.tar.gz)
+          if [[ ${#archives[@]} -ne 1 || ! -f "${archives[0]}" ]]; then
+            echo "Expected exactly one ${{ matrix.target }} archive" >&2
+            exit 1
+          fi
+          mkdir build/release/extracted
+          tar -xzf "${archives[0]}" -C build/release/extracted
+          binary="$PWD/build/release/extracted/lns"
+          "$binary" version
+          plan=$("$binary" plan --path testdata/release-smoke --json)
+          grep -q '"name": "release-smoke"' <<< "$plan"
+          grep -q '"state": "managed"' <<< "$plan"
+          cd build/release
+          if command -v sha256sum >/dev/null; then
+            sha256sum --check checksums.txt
+          else
+            shasum -a 256 --check checksums.txt
+          fi

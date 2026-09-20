@@ -124,6 +124,13 @@ func runConfiguredServicesContext(ctx context.Context, names, override []string,
 			return fmt.Errorf("service %q is %s and cannot be started; run `lns plan` for recovery", service.Name, service.State)
 		}
 	}
+	installation, err := requireCaddy(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		return err
+	}
 	dependencies, err := dependencyruntime.Start(ctx, dependencyruntime.Request{
 		Root: root, Project: plan.Project.Name, Worktree: plan.Project.Worktree, Services: selected,
 	})
@@ -207,7 +214,7 @@ func runConfiguredServicesContext(ctx context.Context, names, override []string,
 	if ctx.Err() != nil {
 		return nil
 	}
-	if err := ensureProxyReady(ctx); err != nil {
+	if err := ensureProxyReady(ctx, installation); err != nil {
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -457,11 +464,7 @@ func replaceService(plan *projectplan.Plan, replacement projectplan.Service) {
 	}
 }
 
-func ensureProxyReady(ctx context.Context) error {
-	installation, err := requireCaddy(ctx)
-	if err != nil {
-		return err
-	}
+func ensureProxyReady(ctx context.Context, installation caddy.Installation) error {
 	if _, err := caddy.RegenerateAllCaddyfiles(); err != nil {
 		return fmt.Errorf("generate Caddy config: %w", err)
 	}

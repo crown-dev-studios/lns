@@ -6,18 +6,39 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: write
-  id-token: write
-  attestations: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  validate-tag:
+    name: Validate ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must be semantic, for example v0.1.0" >&2
+            exit 1
+          fi
+
+  verify:
+    uses: ./.github/workflows/verify.yml
+
   release:
     name: Publish ${{ github.ref_name }}
+    needs:
+      - validate-tag
+      - verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -29,27 +50,6 @@ jobs:
         with:
           go-version: 1.26.1
           cache: true
-
-      - name: Validate tag
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Release tag must be semantic, for example v0.1.0" >&2
-            exit 1
-          fi
-
-      - name: Verify module files
-        run: |
-          go fmt ./...
-          go mod tidy
-          git diff --exit-code
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Vet
-        run: go vet ./...
 
       - name: Verify release credentials
         env:
@@ -100,7 +100,18 @@ jobs:
         with:
           subject-path: build/release/*.tar.gz
 
-  verify:
+      - name: Summarize release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "## Published $RELEASE_TAG"
+            echo
+            echo "### Artifacts"
+            jq -r '.[] | select(.type == "Archive" or .type == "Checksum" or .type == "SBOM") | "- `\(.name)`"' build/release/artifacts.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify-published:
     name: Verify published checksums
     needs: release
     runs-on: ubuntu-latest

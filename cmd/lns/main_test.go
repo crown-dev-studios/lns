@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/crown-dev-studios/lns/internal/models"
@@ -89,6 +91,44 @@ func TestBuildRunPlanDoesNotCreateRepositoryConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, "lns.json")); !os.IsNotExist(err) {
 		t.Fatalf("bare planning created repository config: %v", err)
+	}
+}
+
+func TestRunChecksCaddyBeforeStartingDockerDependencies(t *testing.T) {
+	repo := t.TempDir()
+	mustWriteRunFixture(t, filepath.Join(repo, "package.json"), `{
+  "name":"demo", "private":true,
+  "scripts":{"server":"node server.js"},
+  "dependencies":{"express":"^5"}
+}`)
+	mustWriteRunFixture(t, filepath.Join(repo, ".env"), "DATABASE_URL=postgresql://user:secret@localhost:5432/app\n")
+	mustWriteRunFixture(t, filepath.Join(repo, "compose.yml"), "services:\n  postgres:\n    image: postgres:18\n")
+
+	bin := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "docker-called")
+	docker := "#!/bin/sh\n: > " + marker + "\nexit 1\n"
+	mustWriteRunFixture(t, filepath.Join(bin, "docker"), docker)
+	if err := os.Chmod(filepath.Join(bin, "docker"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
+
+	oldRoot, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(repo); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldRoot) })
+
+	err = runConfiguredServicesContext(context.Background(), nil, nil, 0)
+	if err == nil || !strings.Contains(err.Error(), "Caddy v2 is required") {
+		t.Fatalf("expected Caddy preflight error, got %v", err)
+	}
+	if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+		t.Fatalf("Docker ran before Caddy preflight: %v", statErr)
 	}
 }
 

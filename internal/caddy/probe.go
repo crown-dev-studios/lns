@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
+
+const defaultProbeTimeout = 5 * time.Second
 
 var (
 	ErrNotFound     = errors.New("caddy executable not found")
@@ -20,14 +23,23 @@ type Installation struct {
 }
 
 func Probe(ctx context.Context) (Installation, error) {
+	return probe(ctx, defaultProbeTimeout)
+}
+
+func probe(ctx context.Context, timeout time.Duration) (Installation, error) {
 	path, err := exec.LookPath("caddy")
 	if err != nil {
 		return Installation{}, fmt.Errorf("%w in PATH", ErrNotFound)
 	}
-	output, err := exec.CommandContext(ctx, path, "version").CombinedOutput()
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	output, err := exec.CommandContext(probeCtx, path, "version").CombinedOutput()
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return Installation{}, ctxErr
+		}
+		if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
+			return Installation{}, fmt.Errorf("%w: %s version timed out after %s", ErrUnavailable, path, timeout)
 		}
 		detail := strings.TrimSpace(string(output))
 		if detail == "" {
@@ -43,11 +55,14 @@ func Probe(ctx context.Context) (Installation, error) {
 	if !strings.HasPrefix(version, "v2.") {
 		return Installation{}, fmt.Errorf("%w: %s reports %q; LNS requires Caddy v2", ErrIncompatible, path, version)
 	}
-	adapt := exec.CommandContext(ctx, path, "adapt", "--config", "-")
+	adapt := exec.CommandContext(probeCtx, path, "adapt", "--config", "-")
 	adapt.Stdin = strings.NewReader("{\n\tadmin off\n}\n")
 	if output, err := adapt.CombinedOutput(); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return Installation{}, ctxErr
+		}
+		if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
+			return Installation{}, fmt.Errorf("%w: %s adapt timed out after %s", ErrUnavailable, path, timeout)
 		}
 		detail := strings.TrimSpace(string(output))
 		if detail == "" {

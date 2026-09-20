@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestProbeReportsMissingCaddy(t *testing.T) {
@@ -74,5 +76,38 @@ func TestProbeRejectsCaddyWithoutRequiredAdapter(t *testing.T) {
 	_, err := Probe(context.Background())
 	if !errors.Is(err, ErrIncompatible) {
 		t.Fatalf("expected ErrIncompatible, got %v", err)
+	}
+}
+
+func TestProbeTimesOutWhileReadingVersion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "caddy")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nsleep 5\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	started := time.Now()
+	_, err := probe(context.Background(), 25*time.Millisecond)
+	if !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected timed-out ErrUnavailable, got %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("probe timeout took %v", elapsed)
+	}
+}
+
+func TestProbeTimesOutWhileAdapting(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "caddy")
+	script := "#!/bin/sh\nif [ \"$1\" = version ]; then echo 'v2.10.2'; exit 0; fi\nsleep 5\n"
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	_, err := probe(context.Background(), 25*time.Millisecond)
+	if !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("expected timed-out ErrUnavailable, got %v", err)
 	}
 }

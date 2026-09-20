@@ -58,13 +58,14 @@ git push origin v0.1.0
 
 The tag starts `.github/workflows/release.yml`. That workflow:
 
-1. Validates the tag and module files.
-2. Runs the race-enabled test suite and vet.
-3. Signs and notarizes macOS binaries.
-4. Builds macOS and Linux archives for amd64 and arm64.
-5. Generates checksums and SBOMs.
-6. Publishes the GitHub release and updates the Homebrew tap.
-7. Attests the archives and independently downloads the release to verify checksums.
+1. Validates the tag.
+2. Runs the same macOS/Linux and Go 1.24/1.26 verification workflow required by normal CI.
+3. Builds all four snapshot archives on matching native runners, extracts each archive, and smoke-tests `lns version` plus a fixture-backed `lns plan`.
+4. Signs and notarizes macOS binaries.
+5. Builds macOS and Linux release archives for amd64 and arm64.
+6. Generates checksums and SBOMs.
+7. Publishes the GitHub release and updates the Homebrew tap.
+8. Attests the archives and independently downloads the release to verify checksums.
 
 Do not move or replace a published tag. If a release is wrong, fix the problem and publish the next patch version, such as `v0.1.1`.
 
