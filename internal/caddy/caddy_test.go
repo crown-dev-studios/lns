@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"lns/internal/config"
-	"lns/internal/devruntime"
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/devruntime"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 func TestRuntimeCaddyfileRoutesStandardAndHMRLeases(t *testing.T) {

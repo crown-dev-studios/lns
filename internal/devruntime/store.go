@@ -7,9 +7,9 @@ import (
 	"sort"
 	"time"
 
-	"lns/internal/config"
-	"lns/internal/models"
-	"lns/internal/state"
+	"github.com/crown-dev-studios/lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/state"
 )
 
 type Lease struct {

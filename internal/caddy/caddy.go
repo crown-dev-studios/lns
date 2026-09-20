@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"lns/internal/config"
-	"lns/internal/devruntime"
-	"lns/internal/models"
-	"lns/internal/state"
+	"github.com/crown-dev-studios/lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/devruntime"
+	"github.com/crown-dev-studios/lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/state"
 )
 
 func RegenerateAllCaddyfiles() ([]string, error) {

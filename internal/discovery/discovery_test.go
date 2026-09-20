@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 func TestDetectServicesFindsAppsFolderService(t *testing.T) {

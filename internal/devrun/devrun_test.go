@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 func TestResolveCommandRunsSimpleViteScriptOnLeasedPort(t *testing.T) {

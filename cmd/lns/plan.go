@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
 )
 
 var planCmd = &cobra.Command{

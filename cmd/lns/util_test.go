@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/config"
 )
 
 func TestStartCaddyUsesDirectExecutableWhenItCanBind(t *testing.T) {

@@ -23,11 +23,11 @@ import (
 	"syscall"
 	"time"
 
-	"lns/internal/config"
-	"lns/internal/devrun"
-	"lns/internal/discovery"
-	"lns/internal/projectplan"
-	"lns/internal/state"
+	"github.com/crown-dev-studios/lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/devrun"
+	"github.com/crown-dev-studios/lns/internal/discovery"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/state"
 )
 
 type Request struct {

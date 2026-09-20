@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
 )
 
 func TestWritePlanJSONEmitsOnlyMachineReadablePlan(t *testing.T) {

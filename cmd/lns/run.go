@@ -13,13 +13,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"lns/internal/caddy"
-	"lns/internal/config"
-	"lns/internal/dependencyruntime"
-	"lns/internal/devrun"
-	"lns/internal/devruntime"
-	"lns/internal/models"
-	"lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/caddy"
+	"github.com/crown-dev-studios/lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/dependencyruntime"
+	"github.com/crown-dev-studios/lns/internal/devrun"
+	"github.com/crown-dev-studios/lns/internal/devruntime"
+	"github.com/crown-dev-studios/lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
 )
 
 type serviceRun struct {
@@ -458,16 +458,16 @@ func replaceService(plan *projectplan.Plan, replacement projectplan.Service) {
 }
 
 func ensureProxyReady(ctx context.Context) error {
-	caddyPath, err := exec.LookPath("caddy")
+	installation, err := requireCaddy(ctx)
 	if err != nil {
-		return fmt.Errorf("Caddy is not installed or not in PATH")
+		return err
 	}
 	if _, err := caddy.RegenerateAllCaddyfiles(); err != nil {
 		return fmt.Errorf("generate Caddy config: %w", err)
 	}
 	global := config.GetGlobalCaddyfilePath()
 	if isTCPListening(config.CaddyAdminAddr) {
-		command := exec.CommandContext(ctx, caddyPath, "reload", "--config", global, "--address", config.CaddyAdminAddr)
+		command := exec.CommandContext(ctx, installation.Path, "reload", "--config", global, "--address", config.CaddyAdminAddr)
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 		if err := command.Run(); err != nil {
@@ -475,7 +475,7 @@ func ensureProxyReady(ctx context.Context) error {
 		}
 		return nil
 	}
-	return startCaddy(ctx, caddyPath, global, config.DefaultHTTPPort)
+	return startCaddy(ctx, installation.Path, global, config.DefaultHTTPPort)
 }
 
 func executeRuns(ctx context.Context, runs []serviceRun) error {
@@ -579,7 +579,12 @@ func cleanupRuns(store *devruntime.Store, runs []serviceRun) {
 	if isTCPListening(config.CaddyAdminAddr) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		command := exec.CommandContext(ctx, "caddy", "reload", "--config", config.GetGlobalCaddyfilePath(), "--address", config.CaddyAdminAddr)
+		installation, err := requireCaddy(ctx)
+		if err != nil {
+			printWarning("Could not find Caddy during cleanup: %v", err)
+			return
+		}
+		command := exec.CommandContext(ctx, installation.Path, "reload", "--config", config.GetGlobalCaddyfilePath(), "--address", config.CaddyAdminAddr)
 		if err := command.Run(); err != nil {
 			printWarning("Could not reload Caddy during cleanup: %v", err)
 		}

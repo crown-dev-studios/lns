@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"lns/internal/discovery"
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/discovery"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 var (

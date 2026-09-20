@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 var (

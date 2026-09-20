@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"lns/internal/models"
-	"lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
 )
 
 func TestBareCommandRejectsUnexpectedArguments(t *testing.T) {

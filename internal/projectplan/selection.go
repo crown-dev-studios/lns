@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"lns/internal/discovery"
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/discovery"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 type rootWrapper struct {

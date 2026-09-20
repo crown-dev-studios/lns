@@ -10,11 +10,9 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"lns/internal/caddy"
-	"lns/internal/config"
+	"github.com/crown-dev-studios/lns/internal/caddy"
+	"github.com/crown-dev-studios/lns/internal/config"
 )
-
-var version = "0.3.0"
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -45,7 +43,7 @@ var versionCmd = &cobra.Command{
 	Short: "Print version information",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("lns version %s\n", version)
+		fmt.Fprintln(cmd.OutOrStdout(), versionString())
 	},
 }
 
@@ -54,21 +52,21 @@ var startCmd = &cobra.Command{
 	Short: "Start the shared local proxy",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		installation, err := requireCaddy(cmd.Context())
+		if err != nil {
+			return err
+		}
 		if err := config.EnsureConfigDirs(); err != nil {
 			return fmt.Errorf("create LNS state directories: %w", err)
 		}
 		if _, err := caddy.RegenerateAllCaddyfiles(); err != nil {
 			return fmt.Errorf("generate proxy configuration: %w", err)
 		}
-		caddyPath, err := exec.LookPath("caddy")
-		if err != nil {
-			return fmt.Errorf("Caddy is not installed; install it with `brew install caddy` or from https://caddyserver.com/docs/install")
-		}
 		if isTCPListening(config.CaddyAdminAddr) {
 			printSuccess("Proxy is already running")
 			return nil
 		}
-		if err := startCaddy(cmd.Context(), caddyPath, config.GetGlobalCaddyfilePath(), config.DefaultHTTPPort); err != nil {
+		if err := startCaddy(cmd.Context(), installation.Path, config.GetGlobalCaddyfilePath(), config.DefaultHTTPPort); err != nil {
 			return err
 		}
 		printSuccess("Proxy started at http://*.localhost")
@@ -85,11 +83,11 @@ var stopCmd = &cobra.Command{
 			printSuccess("Proxy is already stopped")
 			return nil
 		}
-		caddyPath, err := exec.LookPath("caddy")
+		installation, err := requireCaddy(cmd.Context())
 		if err != nil {
-			return fmt.Errorf("Caddy is not in PATH; stop the process listening at %s manually", config.CaddyAdminAddr)
+			return fmt.Errorf("%w; stop the process listening at %s manually", err, config.CaddyAdminAddr)
 		}
-		command := exec.Command(caddyPath, "stop", "--address", config.CaddyAdminAddr)
+		command := exec.Command(installation.Path, "stop", "--address", config.CaddyAdminAddr)
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 		if err := command.Run(); err != nil {
@@ -118,10 +116,10 @@ var doctorCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var issues []string
-		if path, err := exec.LookPath("caddy"); err != nil {
-			issues = append(issues, "Caddy is missing; install it with `brew install caddy`")
+		if installation, err := requireCaddy(cmd.Context()); err != nil {
+			issues = append(issues, err.Error())
 		} else {
-			printSuccess("Caddy: %s", path)
+			printSuccess("Caddy %s: %s", installation.Version, installation.Path)
 		}
 		if path, err := exec.LookPath("docker"); err != nil {
 			printWarning("Docker is missing; projects without Compose dependencies can still run")

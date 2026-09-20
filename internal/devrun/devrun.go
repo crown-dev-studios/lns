@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	"lns/internal/models"
+	"github.com/crown-dev-studios/lns/internal/models"
 )
 
 var viteCommandPattern = regexp.MustCompile(`(?:^|[\s"';&|])vite(?:[\s"';&|]|$)`)

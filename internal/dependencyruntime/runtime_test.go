@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"lns/internal/projectplan"
+	"github.com/crown-dev-studios/lns/internal/projectplan"
 )
 
 func TestSelectProvidersForRepresentativeProjectShapes(t *testing.T) {

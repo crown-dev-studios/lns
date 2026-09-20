@@ -1,7 +1,9 @@
 BINARY_NAME=lns
-VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+VERSION?=dev
+COMMIT?=$(shell git rev-parse --short=12 HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE?=$(shell git show -s --format=%cI HEAD 2>/dev/null || echo "unknown")
+LDFLAGS=-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE)
+GORELEASER?=goreleaser
 
 # Go parameters
 GOCMD=go
@@ -15,32 +17,17 @@ GOMOD=$(GOCMD) mod
 BUILD_DIR=build
 CMD_DIR=cmd/lns
 
-.PHONY: all build clean test coverage deps lint install uninstall release help
+.PHONY: all build build-fast clean test coverage deps lint fmt vet tidy snapshot release-check help
 
 all: build
 
 ## Build
 
 build: ## Build for current platform
-	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
+	$(GOBUILD) -trimpath -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
 
 build-fast: ## Build without optimizations (faster compile)
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./$(CMD_DIR)
-
-## Cross-platform builds
-
-build-all: build-linux build-darwin build-windows ## Build for all platforms
-
-build-linux: ## Build for Linux (amd64 and arm64)
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 ./$(CMD_DIR)
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 ./$(CMD_DIR)
-
-build-darwin: ## Build for macOS (amd64 and arm64)
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 ./$(CMD_DIR)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 ./$(CMD_DIR)
-
-build-windows: ## Build for Windows
-	GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe ./$(CMD_DIR)
 
 ## Development
 
@@ -74,26 +61,13 @@ deps: ## Download dependencies
 tidy: ## Tidy dependencies
 	$(GOMOD) tidy
 
-## Installation
-
-install: build ## Install to /usr/local/bin
-	cp $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)
-
-install-user: build ## Install to ~/bin
-	mkdir -p ~/bin
-	cp $(BUILD_DIR)/$(BINARY_NAME) ~/bin/$(BINARY_NAME)
-
-uninstall: ## Remove from /usr/local/bin
-	rm -f /usr/local/bin/$(BINARY_NAME)
-
 ## Release
 
-release: clean build-all ## Build release binaries
-	@echo "Release binaries in $(BUILD_DIR)/"
-	@ls -la $(BUILD_DIR)/
+release-check: ## Validate the GoReleaser configuration
+	$(GORELEASER) check
 
-checksums: ## Generate checksums for release binaries
-	cd $(BUILD_DIR) && sha256sum * > checksums.txt
+snapshot: ## Build local release artifacts without publishing
+	$(GORELEASER) release --snapshot --clean
 
 ## Cleanup
 
