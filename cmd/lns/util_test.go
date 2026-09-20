@@ -37,6 +37,25 @@ func TestStartCaddyDoesNotPromptForSudoWithoutTerminal(t *testing.T) {
 	}
 }
 
+func TestStopCaddyOnlyRequiresTheExecutable(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "arguments")
+	executable := writeExecutable(t, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$LNS_TEST_MARKER\"\n")
+	t.Setenv("PATH", filepath.Dir(executable))
+	t.Setenv("LNS_TEST_MARKER", marker)
+
+	if err := stopCaddy(context.Background()); err != nil {
+		t.Fatalf("stop Caddy: %v", err)
+	}
+	arguments, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "stop\n--address\n" + config.CaddyAdminAddr + "\n"
+	if string(arguments) != want {
+		t.Fatalf("expected stop arguments %q, got %q", want, arguments)
+	}
+}
+
 func TestDevNullIsNotInteractive(t *testing.T) {
 	null, err := os.Open(os.DevNull)
 	if err != nil {

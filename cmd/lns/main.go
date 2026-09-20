@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -83,19 +84,26 @@ var stopCmd = &cobra.Command{
 			printSuccess("Proxy is already stopped")
 			return nil
 		}
-		installation, err := requireCaddy(cmd.Context())
-		if err != nil {
-			return fmt.Errorf("%w; stop the process listening at %s manually", err, config.CaddyAdminAddr)
-		}
-		command := exec.Command(installation.Path, "stop", "--address", config.CaddyAdminAddr)
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-		if err := command.Run(); err != nil {
-			return fmt.Errorf("stop Caddy: %w", err)
+		if err := stopCaddy(cmd.Context()); err != nil {
+			return err
 		}
 		printSuccess("Proxy stopped")
 		return nil
 	},
+}
+
+func stopCaddy(ctx context.Context) error {
+	caddyPath, err := exec.LookPath("caddy")
+	if err != nil {
+		return fmt.Errorf("Caddy is not in PATH; stop the process listening at %s manually", config.CaddyAdminAddr)
+	}
+	command := exec.CommandContext(ctx, caddyPath, "stop", "--address", config.CaddyAdminAddr)
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("stop Caddy: %w", err)
+	}
+	return nil
 }
 
 var configCmd = &cobra.Command{
