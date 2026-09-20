@@ -19,12 +19,19 @@ http://my-app-api.localhost
 
 ## Install
 
+Homebrew is the recommended installation path on macOS. It installs both LNS and its Caddy dependency:
+
 ```bash
-go install ./cmd/lns
-brew install caddy # macOS
+brew install --cask crown-dev-studios/tap/lns
 ```
 
-On Linux, install Caddy and allow it to bind port 80. For example:
+Go developers can install the same release directly:
+
+```bash
+go install github.com/crown-dev-studios/lns/cmd/lns@v0.1.0
+```
+
+`go install` installs only LNS, so install Caddy v2 separately. On macOS, use `brew install caddy`. On Linux, follow the [official Caddy installation instructions](https://caddyserver.com/docs/install) and allow Caddy to bind port 80. For example:
 
 ```bash
 sudo setcap 'cap_net_bind_service=+ep' "$(command -v caddy)"
@@ -33,6 +40,8 @@ sudo setcap 'cap_net_bind_service=+ep' "$(command -v caddy)"
 On macOS or Linux without that capability, the first interactive proxy start asks for `sudo` and leaves Caddy running in the background. Non-interactive runs fail with an actionable message instead of hanging on a password prompt.
 
 Run `lns doctor` to check the local setup.
+
+Versioned macOS and Linux archives, checksums, SBOMs, and build attestations are also published with each [GitHub release](https://github.com/crown-dev-studios/lns/releases).
 
 ## What bare `lns` does
 
@@ -149,7 +158,10 @@ The route contract is always `http://*.localhost` on port 80. Caddy control is f
 ```bash
 env GOCACHE=/tmp/lns-go-build-cache go test ./...
 env GOCACHE=/tmp/lns-go-build-cache go vet ./...
+make build
 ```
+
+See [docs/releasing.md](docs/releasing.md) for the release process. Source builds are for contributors; normal installation should use Homebrew, a tagged `go install`, or a GitHub release archive.
 
 ## License
 
