@@ -108,7 +108,19 @@ jobs:
           mkdir build/release/extracted
           tar -xzf "${archives[0]}" -C build/release/extracted
           binary="$PWD/build/release/extracted/lns"
-          "$binary" version
+          archive_name=${archives[0]##*/}
+          expected_version=${archive_name#lns_}
+          expected_version=${expected_version%_${{ matrix.archive }}.tar.gz}
+          version_output=$("$binary" version)
+          echo "$version_output"
+          if [[ "$version_output" != "lns version $expected_version ("* ]]; then
+            echo "Expected archive version $expected_version, got: $version_output" >&2
+            exit 1
+          fi
+          if ! grep -Eq '^lns version [^[:space:]]+ \(commit [0-9a-f]{12}, built [^)]+\)$' <<< "$version_output"; then
+            echo "Version output is missing release commit or build date: $version_output" >&2
+            exit 1
+          fi
           plan=$("$binary" plan --path testdata/release-smoke --json)
           grep -q '"name": "release-smoke"' <<< "$plan"
           grep -q '"state": "managed"' <<< "$plan"

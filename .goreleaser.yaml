@@ -70,6 +70,7 @@ release:
 
 homebrew_casks:
   - name: lns
+    skip_upload: auto
     ids:
       - lns
     binaries:
