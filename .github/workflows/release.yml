@@ -39,8 +39,6 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    outputs:
-      release_commit: ${{ steps.homebrew_formula.outputs.release_commit }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,10 +69,25 @@ jobs:
           ref: main
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: build/homebrew-tap
+          fetch-depth: 0
+
+      - name: Prepare Homebrew tap branch
+        if: ${{ !contains(github.ref_name, '-') }}
+        id: homebrew_branch
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          branch="lns/$RELEASE_TAG"
+          if git -C build/homebrew-tap ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git -C build/homebrew-tap fetch origin "$branch"
+            git -C build/homebrew-tap checkout -B "$branch" FETCH_HEAD
+          else
+            git -C build/homebrew-tap checkout -b "$branch"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
 
       - name: Render Homebrew formula
         if: ${{ !contains(github.ref_name, '-') }}
-        id: homebrew_formula
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -91,7 +104,6 @@ jobs:
             "$release_commit" \
             "$build_date" \
             build/homebrew-tap/Formula/lns.rb
-          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
           ruby -c build/homebrew-tap/Formula/lns.rb
           if grep -q '@@' build/homebrew-tap/Formula/lns.rb; then
             echo "Generated formula contains an unresolved template value" >&2
@@ -123,24 +135,58 @@ jobs:
         with:
           subject-path: build/release/*.tar.gz
 
-      - name: Publish Homebrew formula
+      - name: Open Homebrew formula pull request
         if: ${{ !contains(github.ref_name, '-') }}
+        id: homebrew_pr
         env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          HOMEBREW_BRANCH: ${{ steps.homebrew_branch.outputs.branch }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           git -C build/homebrew-tap config user.name lns-release-bot
           git -C build/homebrew-tap config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git -C build/homebrew-tap add Formula/lns.rb
-          if git -C build/homebrew-tap diff --cached --quiet; then
-            echo "Homebrew formula already points at $RELEASE_TAG"
-            exit 0
+          if ! git -C build/homebrew-tap diff --cached --quiet; then
+            git -C build/homebrew-tap diff --cached --check
+            git -C build/homebrew-tap commit -m "lns $RELEASE_TAG"
+            git -C build/homebrew-tap push origin "HEAD:refs/heads/$HOMEBREW_BRANCH"
           fi
-          git -C build/homebrew-tap diff --cached --check
-          git -C build/homebrew-tap commit -m "lns $RELEASE_TAG"
-          git -C build/homebrew-tap push origin HEAD:main
+
+          pr_url=$(gh pr list \
+            --repo crown-dev-studios/homebrew-tap \
+            --head "$HOMEBREW_BRANCH" \
+            --state open \
+            --json url \
+            --jq '.[0].url // empty')
+          if [[ -z "$pr_url" ]]; then
+            git -C build/homebrew-tap fetch origin main
+            if git -C build/homebrew-tap merge-base --is-ancestor HEAD FETCH_HEAD; then
+              echo "Homebrew formula already points at $RELEASE_TAG"
+            else
+              closed_pr=$(gh pr list \
+                --repo crown-dev-studios/homebrew-tap \
+                --head "$HOMEBREW_BRANCH" \
+                --state closed \
+                --json number,mergedAt \
+                --jq 'map(select(.mergedAt == null))[0].number // empty')
+              if [[ -n "$closed_pr" ]]; then
+                gh pr reopen "$closed_pr" --repo crown-dev-studios/homebrew-tap
+                pr_url=$(gh pr view "$closed_pr" --repo crown-dev-studios/homebrew-tap --json url --jq .url)
+              else
+                pr_url=$(gh pr create \
+                  --repo crown-dev-studios/homebrew-tap \
+                  --base main \
+                  --head "$HOMEBREW_BRANCH" \
+                  --title "lns $RELEASE_TAG" \
+                  --body "Build and publish Homebrew bottles for crown-dev-studios/lns $RELEASE_TAG.")
+              fi
+            fi
+          fi
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
 
       - name: Summarize release
         env:
+          HOMEBREW_PR_URL: ${{ steps.homebrew_pr.outputs.url }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           {
@@ -148,8 +194,12 @@ jobs:
             echo
             echo "### Artifacts"
             jq -r '.[] | select(.type == "Archive" or .type == "Checksum" or .type == "SBOM") | "- `\(.name)`"' build/release/artifacts.json
+            if [[ -n "${HOMEBREW_PR_URL:-}" ]]; then
+              echo
+              echo "### Homebrew"
+              echo "- Bottle pull request: $HOMEBREW_PR_URL"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
-
   verify-published:
     name: Verify published checksums
     needs: release
@@ -166,31 +216,3 @@ jobs:
       - name: Verify checksums
         working-directory: release-assets
         run: sha256sum --check checksums.txt
-
-  verify-homebrew:
-    name: Verify Homebrew installation
-    if: ${{ !contains(github.ref_name, '-') }}
-    needs: release
-    runs-on: macos-latest
-    steps:
-      - name: Install from the published formula
-        run: |
-          test ! -e "$HOME/.lns"
-          brew install --build-from-source crown-dev-studios/tap/lns
-
-      - name: Verify installed behavior
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_COMMIT: ${{ needs.release.outputs.release_commit }}
-        run: |
-          expected_version=${RELEASE_TAG#v}
-          version_output=$(lns version)
-          echo "$version_output"
-          if [[ "$version_output" != "lns version $expected_version (commit ${RELEASE_COMMIT:0:12},"* ]]; then
-            echo "Installed LNS does not report $expected_version from $RELEASE_COMMIT" >&2
-            exit 1
-          fi
-          brew list --formula caddy >/dev/null
-          brew test crown-dev-studios/tap/lns
-          lns doctor
-          test ! -e "$HOME/.lns"
