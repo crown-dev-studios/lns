@@ -1,0 +1,27 @@
+class Lns < Formula
+  desc "Run local development services at stable local names"
+  homepage "https://github.com/crown-dev-studios/lns"
+  url "https://github.com/crown-dev-studios/lns/archive/@@COMMIT@@.tar.gz"
+  version "@@VERSION@@"
+  sha256 "@@SHA256@@"
+  license "MIT"
+
+  head "https://github.com/crown-dev-studios/lns.git", branch: "main"
+
+  depends_on "go" => :build
+  depends_on "caddy"
+
+  def install
+    ldflags = %W[
+      -s -w
+      -X main.version=#{version}
+      -X main.commit=@@COMMIT@@
+      -X main.buildDate=@@BUILD_DATE@@
+    ]
+    system "go", "build", *std_go_args(ldflags:), "./cmd/lns"
+  end
+
+  test do
+    assert_match "lns version #{version}", shell_output("#{bin}/lns version")
+  end
+end

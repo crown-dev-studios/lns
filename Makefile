@@ -65,6 +65,7 @@ tidy: ## Tidy dependencies
 
 release-check: ## Validate the GoReleaser configuration
 	$(GORELEASER) check
+	bash scripts/test-homebrew-formula.sh
 
 snapshot: ## Build local release artifacts without publishing
 	$(GORELEASER) release --snapshot --clean

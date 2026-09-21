@@ -22,7 +22,7 @@ http://my-app-api.localhost
 Homebrew is the recommended installation path on macOS. It installs both LNS and its Caddy dependency:
 
 ```bash
-brew install --cask crown-dev-studios/tap/lns
+brew install crown-dev-studios/tap/lns
 ```
 
 Go developers can install the same release directly:
