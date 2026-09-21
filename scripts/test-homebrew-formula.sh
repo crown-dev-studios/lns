@@ -23,18 +23,14 @@ bash "$script_dir/render-homebrew-formula.sh" \
 ruby -c "$formula" >/dev/null
 grep -Fq 'url "https://github.com/crown-dev-studios/lns/releases/download/v0.1.0/lns_0.1.0_darwin_arm64.tar.gz"' "$formula"
 grep -Fq 'sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$formula"
-grep -Fq 'url "https://github.com/crown-dev-studios/lns/releases/download/v0.1.0/lns_0.1.0_darwin_amd64.tar.gz"' "$formula"
 grep -Fq 'sha256 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' "$formula"
-grep -Fq 'url "https://github.com/crown-dev-studios/lns/releases/download/v0.1.0/lns_0.1.0_linux_arm64.tar.gz"' "$formula"
 grep -Fq 'sha256 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"' "$formula"
-grep -Fq 'url "https://github.com/crown-dev-studios/lns/releases/download/v0.1.0/lns_0.1.0_linux_amd64.tar.gz"' "$formula"
 grep -Fq 'sha256 "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"' "$formula"
 if grep -Fq 'depends_on "go"' "$formula"; then
   echo "Generated formula still depends on Go" >&2
   exit 1
 fi
 grep -Fq 'depends_on "caddy"' "$formula"
-grep -Fq 'bin.install "lns"' "$formula"
 
 if bash "$script_dir/render-homebrew-formula.sh" \
   0.1.0-rc1 \

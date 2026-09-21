@@ -57,7 +57,7 @@ The tag starts `.github/workflows/release.yml`. That workflow:
 4. Builds macOS and Linux release archives for amd64 and arm64.
 5. Generates checksums and SBOMs.
 6. Publishes and attests the GitHub release archives.
-7. For a stable tag, renders the Homebrew formula from the generated archive checksums and updates the tap directly.
+7. For a stable tag, renders the Homebrew formula from the generated archive checksums, runs `brew audit --strict` on it, and updates the tap directly.
 8. Independently verifies the published checksums and installs the stable formula on a clean macOS runner.
 
 The Homebrew verification installs the published archive without Go, confirms that Caddy was installed, runs the formula test and `lns doctor`, and proves installation created no LNS runtime state. A tag such as `v0.1.0-rc1` skips the tap and this stable-channel check.
