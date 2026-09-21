@@ -72,32 +72,6 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: build/homebrew-tap
 
-      - name: Render Homebrew formula
-        if: ${{ !contains(github.ref_name, '-') }}
-        id: homebrew_formula
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          version=${RELEASE_TAG#v}
-          release_commit=$(git rev-parse HEAD)
-          source_archive="$RUNNER_TEMP/lns-$version.tar.gz"
-          source_url="https://github.com/crown-dev-studios/lns/archive/$release_commit.tar.gz"
-          curl --fail --location --retry 3 --output "$source_archive" "$source_url"
-          source_checksum=$(sha256sum "$source_archive" | cut -d ' ' -f 1)
-          build_date=$(git show -s --format=%cI "$release_commit")
-          bash scripts/render-homebrew-formula.sh \
-            "$version" \
-            "$source_checksum" \
-            "$release_commit" \
-            "$build_date" \
-            build/homebrew-tap/Formula/lns.rb
-          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
-          ruby -c build/homebrew-tap/Formula/lns.rb
-          if grep -q '@@' build/homebrew-tap/Formula/lns.rb; then
-            echo "Generated formula contains an unresolved template value" >&2
-            exit 1
-          fi
-
       - name: Install Syft
         id: syft
         uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
@@ -122,6 +96,37 @@ jobs:
         uses: actions/attest@c32b4b8b198b65d0bd9d63490e847ff7b53989d4 # v4.0.0
         with:
           subject-path: build/release/*.tar.gz
+
+      - name: Render Homebrew formula
+        if: ${{ !contains(github.ref_name, '-') }}
+        id: homebrew_formula
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=${RELEASE_TAG#v}
+          release_commit=$(git rev-parse HEAD)
+          bash scripts/render-homebrew-formula.sh \
+            "$version" \
+            build/release/checksums.txt \
+            build/homebrew-tap/Formula/lns.rb
+          echo "release_commit=$release_commit" >> "$GITHUB_OUTPUT"
+          ruby -c build/homebrew-tap/Formula/lns.rb
+          if grep -q '@@' build/homebrew-tap/Formula/lns.rb; then
+            echo "Generated formula contains an unresolved template value" >&2
+            exit 1
+          fi
+
+      - name: Audit Homebrew formula
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_ANALYTICS: "1"
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          tap_dir="$(brew --repository)/Library/Taps/crown-dev-studios"
+          mkdir -p "$tap_dir"
+          ln -sfn "$PWD/build/homebrew-tap" "$tap_dir/homebrew-tap"
+          brew audit --strict --formula crown-dev-studios/tap/lns
 
       - name: Publish Homebrew formula
         if: ${{ !contains(github.ref_name, '-') }}
@@ -176,7 +181,13 @@ jobs:
       - name: Install from the published formula
         run: |
           test ! -e "$HOME/.lns"
-          brew install --build-from-source crown-dev-studios/tap/lns
+          go_before=$(brew list --versions go || true)
+          brew install crown-dev-studios/tap/lns
+          go_after=$(brew list --versions go || true)
+          if [[ "$go_after" != "$go_before" ]]; then
+            echo "Installing LNS unexpectedly changed the installed Go formula" >&2
+            exit 1
+          fi
 
       - name: Verify installed behavior
         env:
