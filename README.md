@@ -25,7 +25,7 @@ Homebrew is the recommended installation path on macOS. It installs both LNS and
 brew install crown-dev-studios/tap/lns
 ```
 
-Apple Silicon macOS and x86_64 Linux receive precompiled Homebrew bottles, so installing LNS does not require Go on those platforms. Homebrew retains a source-build fallback for other platforms.
+Homebrew installs the precompiled release for macOS or Linux on Intel or ARM, so installing LNS does not require Go.
 
 Go developers can install the same release directly:
 

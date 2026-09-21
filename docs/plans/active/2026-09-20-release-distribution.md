@@ -1,7 +1,7 @@
 ---
 title: Release and Distribution Workflow
 date: 2026-09-20
-status: active
+status: complete
 ---
 
 # Release and Distribution Workflow
@@ -29,8 +29,8 @@ The repository has no release tags, GoReleaser configuration, GitHub Actions rel
 - LNS is a Go CLI, but Caddy is a separate executable that LNS starts, reloads, and stops.
 - Stable local names require a Caddy v2 command with the CLI operations LNS uses: `start`, `reload`, `stop`, and `adapt`.
 - Homebrew can manage Caddy as a declared dependency. `go install` and direct archive downloads cannot install external executables.
-- GoReleaser's generated binary formula support is deprecated, so the release workflow renders a small source formula from a checked-in template instead.
-- The Homebrew package builds from the checksummed release commit. It does not require Apple signing credentials or a quarantine bypass.
+- The release workflow renders a small binary formula from a checked-in template instead of relying on GoReleaser's deprecated formula generator.
+- The Homebrew package installs the checksummed GoReleaser archive for the host platform. It does not need Go, Apple signing credentials, or a quarantine bypass.
 - A Homebrew tap update needs a separate repository credential; the default GitHub Actions token cannot write to another repository.
 - Releases must be immutable and derived from SemVer tags.
 - The first public release is `v0.1.0`; the binary reports `0.1.0` without the tag prefix.
@@ -63,7 +63,7 @@ The repository has no release tags, GoReleaser configuration, GitHub Actions rel
 
 ### Option A: Separate Caddy dependency, Homebrew-managed where available
 
-Publish LNS archives and a source-built Homebrew formula. Declare the existing Homebrew `caddy` formula as its runtime dependency. Keep `lns doctor` as the dependency boundary for `go install` and direct downloads.
+Publish LNS archives and a Homebrew formula that installs those precompiled archives. Declare the existing Homebrew `caddy` formula as its runtime dependency. Keep `lns doctor` as the dependency boundary for `go install` and direct downloads.
 
 This produces the lowest-friction Homebrew path without making LNS responsible for Caddy security releases. It also preserves a clear boundary for Linux and Go users.
 
@@ -87,7 +87,7 @@ Keep Caddy separate. Homebrew installs it for the user; other channels check it 
 
 Use GitHub tags as the release source of truth, GoReleaser as the artifact builder/publisher, GitHub Releases as the canonical artifact store, and `crown-dev-studios/homebrew-tap` as the macOS installation channel.
 
-The Homebrew package should be a generated formula that pins the tagged LNS commit and its SHA-256, builds the command with Homebrew's Go helper, and declares `caddy` as a formula dependency. Direct archives and `go install` remain supported secondary channels; those users satisfy the Caddy dependency themselves and verify it with `lns doctor`.
+The Homebrew package should be a generated formula that selects the tagged LNS archive for the host OS and architecture, pins its SHA-256, installs the included binary, and declares `caddy` as a formula dependency. Direct archives and `go install` remain supported secondary channels; those users satisfy the Caddy dependency themselves and verify it with `lns doctor`.
 
 Do not bundle Caddy in the default artifact. If later evidence shows strong demand for a single offline archive, treat that as a separately named distribution with its own provenance and update policy rather than changing the meaning of the normal `lns` archive.
 
@@ -120,7 +120,7 @@ Docker remains optional. A missing Docker executable stays a warning unless the 
 ### Release configuration boundary
 
 - `.goreleaser.yaml` defines supported operating systems, architectures, archive names, checksums, SBOMs, release notes, and build metadata.
-- `packaging/homebrew/lns.rb.tmpl` and `scripts/render-homebrew-formula.sh` define the source-built Homebrew package.
+- `packaging/homebrew/lns.rb.tmpl` and `scripts/render-homebrew-formula.sh` define the precompiled-archive Homebrew package.
 - `.github/workflows/ci.yml` proves ordinary commits.
 - `.github/workflows/release.yml` publishes only tagged, already-verified commits.
 - The separate `homebrew-tap` repository contains the generated formula; application source and its formula template remain in this repository.
@@ -211,7 +211,7 @@ flowchart TD
 ### Phase 6: Add the Homebrew tap
 
 - Create `crown-dev-studios/homebrew-tap` as a separate public repository.
-- Render a source formula from a checked-in template, pin its tag archive checksum, and declare the `caddy` formula dependency.
+- Render a formula from a checked-in template, pin every supported release archive checksum, and declare the `caddy` formula dependency.
 - Use a narrowly scoped GitHub token stored as an Actions secret for tap updates.
 - Add a release-side validation job that installs and tests the published formula on a clean macOS runner.
 - Verify a clean machine can install LNS and Caddy through one Homebrew command, run `lns version`, and pass the Caddy portion of `lns doctor`.
@@ -234,7 +234,7 @@ flowchart TD
 - [x] The tag workflow requires the same supported macOS/Linux and Go-version verification matrix as CI before publication.
 - [ ] A SemVer tag publishes macOS and Linux amd64/arm64 artifacts, checksums, SBOMs, and release notes.
 - [x] No Windows artifact is published until Windows is explicitly supported.
-- [ ] `brew install crown-dev-studios/tap/lns` builds LNS from pinned source and installs the Homebrew Caddy dependency on a clean macOS runner.
+- [ ] `brew install crown-dev-studios/tap/lns` installs the matching precompiled LNS archive and the Homebrew Caddy dependency on a clean macOS runner without installing Go.
 - [ ] The Homebrew installation does not start Caddy or modify a project repository.
 - [x] `lns doctor` distinguishes missing, broken/incompatible, timed-out, and usable Caddy installations and prints actionable remediation.
 - [x] Direct archive and `go install` users get a clear Caddy installation message before LNS attempts Docker or other project work.
@@ -269,5 +269,5 @@ Repository implementation is complete. The unchecked criteria are release-activa
 ## Deferred Work
 
 - **Must do now** — public module path, removal of release-blocking replacements, one version source, CI, Caddy probe, macOS/Linux artifacts, checksums, Homebrew dependency, and installation documentation.
-- **Good follow-up** — submission to `homebrew/core`, Homebrew bottles if install time becomes material, Linux packages, shell completions, and a separately evaluated offline bundle.
+- **Good follow-up** — submission to `homebrew/core`, Linux packages, shell completions, and a separately evaluated offline bundle.
 - **Not worth doing** — runtime auto-download of Caddy, silently stripping macOS quarantine metadata, embedding Caddy into LNS, or publishing Windows merely because Go can cross-compile it.
