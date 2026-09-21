@@ -8,15 +8,17 @@ One tag drives every channel:
 
 - GitHub Releases receives macOS and Linux binaries, checksums, SBOMs, and provenance attestations.
 - `crown-dev-studios/homebrew-tap` receives an automatically generated formula that installs the matching precompiled GitHub Release archive. Homebrew does not rebuild LNS and does not install Go.
-- The public Go module makes `go install github.com/crown-dev-studios/lns/cmd/lns@v0.1.0` available from the same tag. Nothing is uploaded to a separate Go registry.
+- The public Go module supports `go install github.com/crown-dev-studios/lns/cmd/lns@v0.1.0` from the same tag.
 
 Homebrew is the recommended macOS path because it installs Caddy too. Direct archives and `go install` install only LNS; `lns doctor` verifies their local Caddy installation.
 
 ## One-time repository setup
 
-Create the public `crown-dev-studios/homebrew-tap` repository with a `main` branch. Give the release workflow a fine-grained token named `HOMEBREW_TAP_TOKEN` with Contents read/write access to that repository only. This is the only release secret. Stable releases require it; release candidates publish GitHub prereleases without updating Homebrew.
+Create the public `crown-dev-studios/homebrew-tap` repository with a `main` branch.
 
-This flow does not require an Apple Developer certificate, notarization credentials, a GoReleaser account, or a separate artifact host. GoReleaser runs in GitHub Actions and publishes the archives to the GitHub release. The release workflow never removes macOS quarantine metadata.
+Add a fine-grained `HOMEBREW_TAP_TOKEN` secret with Contents read/write access to that repository. Stable releases require it; release candidates skip Homebrew.
+
+GoReleaser runs in GitHub Actions and publishes the archives to the GitHub release.
 
 Protect tags matching `v*` so only maintainers can create or delete them. Protect `main` with the CI workflow required.
 
@@ -36,9 +38,11 @@ goreleaser release --snapshot --clean
 bash scripts/test-homebrew-formula.sh
 ```
 
-The snapshot requires Syft because the release contains archive SBOMs. CI pins Go `1.26.1`, GoReleaser `v2.18.2`, and Syft `v1.52.0`; use those versions when reproducing CI locally. The normal CI matrix also tests the module's minimum Go 1.24 line.
+The snapshot requires Syft to generate archive SBOMs. CI pins Go `1.26.1`, GoReleaser `v2.18.2`, and Syft `v1.52.0`; use those versions when reproducing CI locally.
 
-Run the host binary under `build/release` and confirm that `lns version` reports the snapshot version, commit, and commit date. The formula renderer test proves that stable versions produce valid Ruby with all four release archive checksums and the Caddy runtime dependency, but no Go dependency.
+The CI matrix also tests the minimum Go 1.24 line.
+
+Run the host binary under `build/release` and confirm that `lns version` reports the snapshot version, commit, and commit date.
 
 ## Publishing `v0.1.0`
 
@@ -60,7 +64,9 @@ The tag starts `.github/workflows/release.yml`. That workflow:
 7. For a stable tag, renders the Homebrew formula from the generated archive checksums, runs `brew audit --strict` on it, and updates the tap directly.
 8. Independently verifies the published checksums and installs the stable formula on a clean macOS runner.
 
-The Homebrew verification installs the published archive without Go, confirms that Caddy was installed, runs the formula test and `lns doctor`, and proves installation created no LNS runtime state. A tag such as `v0.1.0-rc1` skips the tap and this stable-channel check.
+The Homebrew verification installs the published archive, confirms Caddy is installed, runs the formula test and `lns doctor`, and checks that installation created no LNS runtime state.
+
+A tag such as `v0.1.0-rc1` skips the tap and this stable-channel check.
 
 Do not move or replace a published tag. If a release is wrong, fix the problem and publish the next patch version, such as `v0.1.1`.
 
